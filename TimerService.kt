@@ -38,6 +38,8 @@ class TimerService : Service(), TextToSpeech.OnInitListener {
         const val EXTRA_STOP = "stop"
         const val EXTRA_INTERVAL = "interval" // seconds
         const val EXTRA_RATE = "rate"         // speech speed, 1.0 = normal
+        const val EXTRA_STEP = "step"         // count by this amount
+        const val EXTRA_REPEAT = "repeat"     // restart when the end is reached
         const val NONE = Int.MIN_VALUE
 
         private const val CHANNEL_ID = "talking_timer"
@@ -60,6 +62,8 @@ class TimerService : Service(), TextToSpeech.OnInitListener {
 
     private var down = false
     private var step = 1
+    private var repeat = false
+    private var startValue = 0
     private var end: Int? = null
     private var intervalMs = 1000L
     private var value = 0          // next number to speak
@@ -71,6 +75,12 @@ class TimerService : Service(), TextToSpeech.OnInitListener {
             current = value
             notifyUi()
             if (reachedEnd(value)) {
+                if (repeat) {
+                    value = startValue
+                    nextAt += intervalMs
+                    handler.postDelayed(this, (nextAt - SystemClock.elapsedRealtime()).coerceAtLeast(0))
+                    return
+                }
                 speak("Done", queue = true)
                 running = false
                 notifyUi()
@@ -111,7 +121,9 @@ class TimerService : Service(), TextToSpeech.OnInitListener {
                 down = intent.getBooleanExtra(EXTRA_DOWN, false)
                 value = intent.getIntExtra(EXTRA_START, 0)
                 current = value
-                step = 1
+                startValue = value
+                step = intent.getIntExtra(EXTRA_STEP, 1).coerceAtLeast(1)
+                repeat = intent.getBooleanExtra(EXTRA_REPEAT, false)
                 intervalMs = (intent.getIntExtra(EXTRA_INTERVAL, 1).coerceAtLeast(1)) * 1000L
                 tts.setSpeechRate(intent.getFloatExtra(EXTRA_RATE, 1f).coerceIn(0.3f, 3f))
                 val stop = intent.getIntExtra(EXTRA_STOP, NONE)
